@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <omp.h>
 
 #include "circular.h"
 
@@ -29,6 +30,9 @@ struct Funnel {
 	int	 type;
 };
 
+int64_t funnel_get(struct Funnel *f);
+void funnel_pop(struct Funnel *f);
+
 /*
  * N - number of elements in the array, we sorting;
  * In the beggining we split input array into K = pow(N, 1/3) buffers with size
@@ -48,10 +52,6 @@ struct Funnel {
  * In each Funnel we have buffer of size 2*K^(3/2), for 2-mergers it's 6.
 */
 
-int64_t funnel_get(struct Funnel *f);
-void funnel_pop(struct Funnel *f);
-void funnel_printer(struct Funnel *f);
-
 /* Comparing function for qsort */
 int compare_int64(const void *p1, const void *p2) {
 	return (*(const int64_t *)p1 > *(const int64_t *)p2);
@@ -70,11 +70,7 @@ void funnel_create_leaf(struct Funnel *f, int64_t *buffer, size_t size) {
 	f->exhausted    = 0;
 	f->buf.buffer_begin  = buffer;
 	f->buf.buffer_end    = buffer + size;
-//	printf("Before sort: Begin - %"PRIi64, *f->buf.buffer_begin);
-//	printf(", End - %"PRIi64"\n", *(f->buf.buffer_end - 1));
 	funnel_sort_leafs(f);
-//	printf("After sort: Begin - %"PRIi64, *f->buf.buffer_begin);
-//	printf(", End - %"PRIi64"\n", *(f->buf.buffer_end - 1));
 }
 
 /* Create non-leaf elements */
@@ -86,6 +82,8 @@ void funnel_create_non_leaf(struct Funnel *f, size_t allocate) {
 	f->fun.funnel_allocate = allocate;
 	_storage_init(&f->fun.storage, (size_t )atoll(getenv("BUFFER_SIZE")));
 }
+
+/* Add child funnel to this funnel */
 void funnel_add_child(struct Funnel *f, struct Funnel *child) {
 	(f->type != 0);
 	if (f->fun.funnel_size == f->fun.funnel_allocate) {
@@ -98,6 +96,7 @@ void funnel_add_child(struct Funnel *f, struct Funnel *child) {
 	f->fun.funnel_size++;
 }
 
+/* Get value from buffer */
 int64_t buffer_get(struct Funnel *f) {
 	assert(f->type == 0);
 	if (f->buf.buffer_begin == f->buf.buffer_end)
@@ -105,6 +104,7 @@ int64_t buffer_get(struct Funnel *f) {
 	return *f->buf.buffer_begin;
 }
 
+/* Pop value from buffer */
 void buffer_pop(struct Funnel *f) {
 	assert(f->type == 0);
 	assert(f->buf.buffer_begin != f->buf.buffer_end);
@@ -115,6 +115,7 @@ void storage_fill_single(struct Funnel *f) {
 	assert(f->type != 0);
 	int64_t min = funnel_get(f->fun.funnels[0]);
 	size_t  funnel = 0;
+	int i = 1;
 	for (int i = 1; i < f->fun.funnel_size; ++i) {
 		int64_t elem = funnel_get(f->fun.funnels[i]);
 		if ((elem < min && elem != -1) || min == -1) {
@@ -135,6 +136,7 @@ void storage_fill(struct Funnel *f) {
 	while(!_storage_full(&f->fun.storage) && !f->exhausted)
 		storage_fill_single(f);
 }
+
 
 int64_t storage_get(struct Funnel *f) {
 	assert(f->type != 0);
@@ -165,24 +167,29 @@ struct Funnel *funnel_create(int64_t *buffer, size_t size) {
 	size_t size_per_leaf = ceil(size / leafs);
 	struct Funnel *funnels = (struct Funnel *)calloc(2 * leafs - 1,
 		sizeof(struct Funnel));
-	for (int i = leafs - 1; i < 2*leafs - 1; ++i) {
-		int64_t *_begin = buffer + (i - leafs + 1)*size_per_leaf;
-		size_t _size  = size_per_leaf;
-		if (i == 2*leafs - 1)
-			_size = size - (i - leafs + 1)*size_per_leaf;
+	int i = 0;
+#pragma omp sections
+	{
+#pragma omp section
+#pragma omp parallel for default(shared), private(i)
+		for (i = leafs - 1; i < 2*leafs - 1; ++i) {
+			int64_t *_begin = buffer + (i - leafs + 1)*size_per_leaf;
+			size_t _size  = size_per_leaf;
+			if (i == 2*leafs - 1)
+				_size = size - (i - leafs + 1)*size_per_leaf;
 
-		funnel_create_leaf(funnels + i,
-		        _begin,
-			_size);
+			funnel_create_leaf(funnels + i,
+				_begin,
+				_size);
+		}
+#pragma omp section
+#pragma omp parallel for default(shared), private(i)
+		for (i = leafs - 2; i >= 0; --i) {
+			funnel_create_non_leaf(funnels + i, 2);
+			funnel_add_child(funnels + i, funnels + i*2 + 1);
+			funnel_add_child(funnels + i, funnels + i*2 + 2);
+		}
 	}
-	for (int i = leafs - 2; i >= 0; --i) {
-		funnel_create_non_leaf(funnels + i, 2);
-		funnel_add_child(funnels + i, funnels + i*2 + 1);
-		funnel_add_child(funnels + i, funnels + i*2 + 2);
-	}
-//	for (int i = leafs; i < 2 * leafs - 1; ++i) {
-//		funnel_printer(funnels + i);
-//	}
 	return funnels;
 }
 
@@ -243,7 +250,6 @@ void funnel_printer(struct Funnel *f) {
 }
 
 int main(int argc, char *argv[], char *arge[]) {
-//	size_t size = 1048576;
 	size_t size = (size_t )atoll(getenv("SORT_SIZE"));
 	int64_t *a = calloc(size, sizeof(int64_t));
 	assert(a);
@@ -262,6 +268,6 @@ int main(int argc, char *argv[], char *arge[]) {
 		funnel_pop(f);
 		b_prev = b;
 	}
-//	funnel_iterate(f, funnel_printer);
+	funnel_iterate(f, funnel_printer);
 	return 0;
 }
