@@ -39,8 +39,6 @@ void funnel_init_leaf(
 	f->buf.buffer_begin = buffer;
 	f->buf.buffer_end = buffer + size * tFunnel->size;
 	qsort(buffer, size, f->tFunnel->size, f->tFunnel->cmp);
-	/*qsort(f->buf.buffer_begin, (size_t )(f->buf.buffer_end - f->buf.buffer_begin),
-			f->tFunnel->size, f->tFunnel->cmp);*/
 }
 
 void funnel_add_child(struct Funnel *f, struct Funnel *child) {
@@ -56,18 +54,6 @@ void funnel_add_child(struct Funnel *f, struct Funnel *child) {
 }
 
 size_t funnel_get_buf_size(struct Funnel *f, size_t lvl, size_t ov_lvl) {
-/*	const size_t D_i = ceil(log2(ov_lvl)/2);
-	printf("D_i: %zd, lvl: %zd, ov_lvl: %zd\n", D_i, lvl, ov_lvl);
-	if (ov_lvl == 1) {
-		return ceil(pow(pow(2, D_i), (double )3/2));
-	}
-	if (D_i > lvl) {
-		return funnel_get_buf_size(lvl, ov_lvl - D_i);
-	} else if (D_i < lvl) {
-		return funnel_get_buf_size(lvl - D_i, D_i);
-	}
-	return ceil(pow(pow(2, D_i + 1), (double )3/2));
-*/
 	if (lvl == ov_lvl) {
 		size_t a = 0;
 		funnel_aiterate(f, funnel_counter, (void *)&a);
@@ -138,18 +124,15 @@ void storage_fill_single(struct Funnel *f) {
 	assert(f->type != 0);
 	void *min = funnel_get(f->fun.funnels[0]);
 	size_t funnel = 0;
+	if (min)
 	for (int i = 1; i < f->fun.funnel_size; ++i) {
 		void *elem = funnel_get(f->fun.funnels[i]);
-		if (elem)
-			printf("%zd, ", *(int64_t *)elem);
-		if ((elem != NULL && min != NULL) && (f->tFunnel->cmp)(elem, min) > 0) {
+		if (!min || ((elem && min) && !(f->tFunnel->cmp)(elem, min))) {
 			min = elem;
 			funnel = i;
 		}
-		if (elem)
-			printf("%zd ;", *(int64_t *)min);
 	}
-	if (min == NULL) {
+	if (!min) {
 		f->exhausted = 1;
 		return;
 	}
@@ -161,7 +144,6 @@ void storage_fill(struct Funnel *f) {
 	assert(f->type != 0);
 	while(!_storage_full(&f->fun.storage) && !f->exhausted)
 		storage_fill_single(f);
-	printf("\n");
 }
 
 inline void *funnel_get(struct Funnel *f) {
@@ -251,33 +233,29 @@ void funnel_printer(struct Funnel *f, void *_unused) {
 }
 
 void storage_printer(struct Funnel *f) {
-	printf("[[ ");
-	void *a = NULL;
+	void *prev = NULL;
+	void *next = NULL;
 	do {
-		a = storage_get(f);
-		if (a == NULL)
+		prev = storage_get(f);
+		if (!prev)
 			break;
-		printf("%zd, ", *(int64_t *)a);
+		printf("%zd, ", *(int64_t *)prev);
 		storage_pop(f);
-	} while (a);
-	printf("]]\n");
+		if (next)
+			assert(*(int64_t *)prev >= *(int64_t *)next);
+		next = prev;
+	} while (prev);
 }
 
 int main() {
-	size_t size = 100;
+	size_t size = 29999999;
 	int64_t *a = calloc(size, sizeof(int64_t));
 	assert(a);
 	for (int i = 0; i < size; ++i)
-		a[i] = size - i + 1;
-//	for (int i = 0; i < size; ++i) {
-//		int64_t temp = (int64_t )rand();
-//		if (temp < 0) temp *= -1;
-//		a[i] = temp + 1;
-//	}
+		a[i] = (int64_t )rand();
 	struct TFunnel tFunnel = {compare_int64, sizeof(int64_t)};
 	struct Funnel *f = funnel_create_binary_top(a, size, &tFunnel);
 	assert(f);
 	storage_fill(f);
-//	funnel_biterate(f, funnel_printer, (void *)NULL);
 	storage_printer(f);
 }
