@@ -7,14 +7,14 @@
 #include <inttypes.h>
 
 struct Storage {
-	int64_t *alloc_begin;
-	int64_t *alloc_end;
-	int64_t *start;
+	void   **alloc_begin;
+	void   **alloc_end;
+	void   **start;
 	size_t  size;
 };
 
 void _storage_init(struct Storage *b, size_t len) {
-	b->alloc_begin = calloc(len, sizeof(int64_t));
+	b->alloc_begin = (void **)calloc(len, sizeof(void *));
 	assert(b->alloc_begin);
 	b->alloc_end = b->alloc_begin + len;
 	b->start = b->alloc_begin;
@@ -29,7 +29,11 @@ int _storage_empty(struct Storage *b) {
 	return (b->size == 0 ? 1 : 0);
 }
 
-int _storage_put(struct Storage *b, uint64_t elem) {
+size_t _storage_size(struct Storage *b) {
+	return (b->alloc_end - b->alloc_begin);
+}
+
+int _storage_put(struct Storage *b, void *elem) {
 	if (_storage_full(b))
 		return -1;
 	size_t pos = b->size + (b->start - b->alloc_begin);
@@ -39,7 +43,7 @@ int _storage_put(struct Storage *b, uint64_t elem) {
 	return 0;
 }
 
-int _storage_put_left(struct Storage *b, uint64_t elem) {
+int _storage_put_left(struct Storage *b, void *elem) {
 	if (_storage_full(b))
 		return -1;
 	b->start = (b->start != b->alloc_begin ? b->start : b->alloc_end) - 1;
@@ -48,13 +52,13 @@ int _storage_put_left(struct Storage *b, uint64_t elem) {
 	return 0;
 }
 
-int64_t _storage_get(struct Storage *b) {
-	return (_storage_empty(b) ? -1 : *b->start);
+void *_storage_get(struct Storage *b) {
+	return (_storage_empty(b) ? NULL : *b->start);
 }
 
-int64_t _storage_get_right(struct Storage *b) {
+void *_storage_get_right(struct Storage *b) {
 	if (_storage_empty(b))
-		return -1;
+		return NULL;
 	size_t pos = (b->start - b->alloc_begin) + b->size - 1;
 	pos %= (b->alloc_end - b->alloc_begin);
 	return b->alloc_begin[pos];
@@ -74,8 +78,8 @@ int _storage_pop_right(struct Storage *b) {
 	b->size--;
 	return 0;
 }
-
-void print_storage(struct Storage *b) {
+/*
+void print_storage_int64(struct Storage *b) {
 	printf("--------------------\n");
 	size_t allocated = b->alloc_end - b->alloc_begin;
 	printf("allocated: %zd\n", allocated);
@@ -83,7 +87,7 @@ void print_storage(struct Storage *b) {
 	size_t first = b->start - b->alloc_begin;
 	size_t last  = (b->start - b->alloc_begin) + b->size;
 	last %= allocated;
-	printf("first: %zd, last: %zd\n", first, last);
+	printf("first: %zd, last: %zd\n", **first, **last);
 	printf("--------------------\n");
 	for(int i = 0; i < allocated; ++i) {
 		if (_storage_empty(b) && i == first && i == last) {
@@ -95,7 +99,7 @@ void print_storage(struct Storage *b) {
 		} else if (i == last) {
 			printf("]]");
 		}
-		printf("%"PRIi64, b->alloc_begin[i]);
+		printf("%"PRIi64, *b->alloc_begin[i]);
 		if (i != allocated - 1)
 			printf(",");
 	}
@@ -143,5 +147,5 @@ int test_storage() {
 	_storage_pop_right(&b);
 	return 0;
 }
-
+*/
 #endif /* CIRCULAR_H */

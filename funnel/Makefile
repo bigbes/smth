@@ -3,17 +3,17 @@ export SORT_SIZE
 BUFFER_SIZE=32
 export BUFFER_SIZE
 
-all: funnel_rel omp_rel qsort
+all: funnel
 timeit: timeit_funnel timeit_omp timeit_qsort
 
 funnel:
-	gcc --std=c99 funnelsort.c -lm -o funnel.out -g -pg
+	gcc --std=c99 funnelsort.c -lm -o funnel.out -g
 funnel_rel:
 	gcc --std=c99 funnelsort.c -lm -o funnel.out -O3
 	strip funnel.out
 
 omp:
-	gcc --std=c99 funnelsort_omp.c -lm -o omp.out -fopenmp -g -pg
+	gcc --std=c99 funnelsort_omp.c -lm -o omp.out -fopenmp -g
 omp_rel:
 	gcc --std=c99 funnelsort_omp.c -lm -o omp.out -fopenmp -O3
 	strip funnel.out

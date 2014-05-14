@@ -2,6 +2,8 @@
 #define INCLUDES_FUNNELSORT_H
 #include <stddef.h>
 
+#include "circular2.h"
+
 typedef int ( cmp_t)(const void *, const void *);
 typedef int (* cmpptr_t)(const void *, const void *);
 
@@ -32,4 +34,20 @@ struct TFunnel {
 	size_t size;
 };
 
+typedef void (cb_t)(struct Funnel *, void *);
+typedef void (* cbptr_t)(struct Funnel *, void *);
+
+void funnel_aiterate(struct Funnel *, cb_t *, void *);
+void funnel_biterate(struct Funnel *, cb_t *, void *);
+
+void funnel_counter(struct Funnel *, void *);
+void funnel_printer(struct Funnel *, void *);
+
+void *funnel_get(struct Funnel *f);
+void *storage_get(struct Funnel *f);
+void *buffer_get(struct Funnel *f);
+
+void funnel_pop(struct Funnel *f);
+void storage_pop(struct Funnel *f);
+void buffer_pop(struct Funnel *f);
 #endif /* INCLUDES_FUNNELSORT_H */
