@@ -59,6 +59,32 @@ size_t funnel_get_buf_size(struct Funnel *f, size_t lvl, size_t ov_lvl) {
 		funnel_aiterate(f, funnel_counter, (void *)&a);
 		return a + 1;
 	}
+	size_t buf_size = 0;
+	if (ov_lvl == 3) {
+		if (lvl == 3) {
+			return 8;
+		} else if (lvl == 2) {
+			return 3;
+		} else if (lvl == 1) {
+			return 2;
+		}
+	} else if (ov_lvl == 2) {
+		if (lvl == 2) {
+			return 3;
+		} if (lvl == 1) {
+			return 2;
+		}
+	} else if (ov_lvl == 1) {
+		return 2;
+	}
+	size_t D_i = ceil(ov_lvl/2);
+	if (lvl == D_i) {
+		return ceil(pow(pow(2, ov_lvl), 0.5));
+	} else if (lvl > D_i) {
+		return funnel_get_buf_size(f, lvl - D_i, ov_lvl - D_i);
+	} else if (lvl < D_i) {
+		return funnel_get_buf_size(f, lvl, ov_lvl - D_i);
+	}
 	return 8;
 }
 
@@ -248,7 +274,7 @@ void storage_printer(struct Funnel *f) {
 }
 
 int main() {
-	size_t size = 29999999;
+	size_t size = 1024;
 	int64_t *a = calloc(size, sizeof(int64_t));
 	assert(a);
 	for (int i = 0; i < size; ++i)
