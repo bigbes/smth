@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "funnelsort_2.0.h"
+#include "funnelsort.h"
 
 void funnel_init_non_leaf(
 		struct Funnel *f,
