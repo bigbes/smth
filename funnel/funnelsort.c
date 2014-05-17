@@ -1,7 +1,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <math.h>
+#include <inttypes.h>
 
 #include "funnelsort.h"
 
@@ -26,6 +28,7 @@ void funnel_init_leaf(
 	f->type = IS_LEAF;
 	f->tFunnel = tFunnel;
 	f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
+	qsort(buffer, size, f->tFunnel->size, f->tFunnel->cmp);
 	_circular_init_leaf(f->buffer, buffer, buffer + size * tFunnel->size, tFunnel->size);
 }
 
@@ -36,7 +39,7 @@ void funnel_add_child(struct Funnel *f, struct Funnel *child) {
 		f->funnels = realloc(f->funnels, sizeof(struct Funnel *) * f->funnel_allocate);
 		assert(f->funnels);
 	}
-	f->funnels[f->funnel_cnt++] = child;	
+	f->funnels[f->funnel_cnt++] = child;
 }
 
 size_t funnel_get_buf_size(size_t lvl, size_t height, size_t top_flag) {
@@ -91,7 +94,7 @@ void funnel_invoke(struct Funnel *f) {
 			}
 		}
 		if (!min) {
-			f->type = f->type & IS_EXHAUSTED;
+			f->type = f->type | IS_EXHAUSTED;
 			continue;
 		}
 		_circular_put_right(f->buffer, min);
@@ -166,4 +169,8 @@ int main() {
 	struct Funnel *f = funnel_create_binary_top(a, size, &tFunnel);
 	assert(f);
 	funnel_invoke(f);
+	for(size_t i = 0; i < size; ++i) {
+		printf("%"PRId64"\n", *(int64_t *)funnel_get(f));
+		funnel_pop(f);
+	}
 }
