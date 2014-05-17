@@ -7,6 +7,8 @@
 
 #include "funnelsort.h"
 
+#define LEAF_SIZE 64
+
 void funnel_init_non_leaf(
 		struct Funnel *f,
 		struct TFunnel *tFunnel,
@@ -15,9 +17,9 @@ void funnel_init_non_leaf(
 	f->type = 0;
 	f->tFunnel = tFunnel;
 	f->funnels = calloc(nfun, sizeof(struct Funnel *));
+	f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
 	f->funnel_allocate = nfun;
 	f->funnel_cnt = 0;
-	f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
 }
 
 void funnel_init_leaf(
@@ -25,11 +27,17 @@ void funnel_init_leaf(
 		void *buffer,
 		size_t size,
 		struct TFunnel *tFunnel) {
-	f->type = IS_LEAF;
-	f->tFunnel = tFunnel;
-	f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
-	qsort(buffer, size, f->tFunnel->size, f->tFunnel->cmp);
-	_circular_init_leaf(f->buffer, buffer, buffer + size * tFunnel->size, tFunnel->size);
+	if (size > LEAF_SIZE) {
+		funnel_init_non_leaf(f, tFunnel, 1);
+		f->buffer = NULL;
+		f->type = IS_MIXED_LEAF;
+	} else {
+		f->tFunnel = tFunnel;
+		f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
+		f->type = IS_LEAF;
+		qsort(buffer, size, f->tFunnel->size, f->tFunnel->cmp);
+		_circular_init_leaf(f->buffer, buffer, buffer + size * tFunnel->size, tFunnel->size);
+	}
 }
 
 void funnel_add_child(struct Funnel *f, struct Funnel *child) {
@@ -68,6 +76,8 @@ void funnel_init_buffers(struct Funnel *f, size_t lvl, size_t height, size_t top
 }
 
 void *funnel_get(struct Funnel *f) {
+	if (f->type & IS_MIXED_LEAF)
+		return funnel_get(f->funnels[0]);
 	if (_circular_empty(f->buffer)) {
 		if (f->type & IS_EXHAUSTED)
 			return NULL;
@@ -78,6 +88,8 @@ void *funnel_get(struct Funnel *f) {
 }
 
 void funnel_pop(struct Funnel *f) {
+	if (f->type & IS_MIXED_LEAF)
+		return funnel_pop(f->funnels[0]);
 	assert(!_circular_empty(f->buffer));
 	_circular_pop_left(f->buffer);
 }
@@ -132,7 +144,8 @@ struct Funnel *funnel_create_binary(struct Funnel *parent,
 
 struct Funnel *funnel_create_binary_top(void  *buffer,
 					size_t buf_size,
-					struct TFunnel *tFunnel) {
+					struct TFunnel *tFunnel,
+					size_t top_flag) {
 	size_t leafs = (size_t )pow((double )2, ceil(log2(pow((double )buf_size,
 							      (double )1/3))));
 	assert(leafs > 2);
@@ -151,7 +164,7 @@ struct Funnel *funnel_create_binary_top(void  *buffer,
 						leafs/2,
 						tree_height));
 	size_t lvl = log2((double )leafs);
-	funnel_init_buffers(this, lvl, lvl, buf_size);
+	funnel_init_buffers(this, lvl, lvl, (top_flag ? top_flag : buf_size));
 	return this;
 }
 
@@ -166,7 +179,7 @@ int main() {
 	for (int i = 0; i < size; ++i)
 		a[i] = (int64_t )rand();
 	struct TFunnel tFunnel = {compare_int64, sizeof(int64_t)};
-	struct Funnel *f = funnel_create_binary_top(a, size, &tFunnel);
+	struct Funnel *f = funnel_create_binary_top(a, size, &tFunnel, 0);
 	assert(f);
 	funnel_invoke(f);
 	for(size_t i = 0; i < size; ++i) {

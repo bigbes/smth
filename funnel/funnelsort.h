@@ -5,8 +5,9 @@
 typedef int ( cmp_t)(const void *, const void *);
 typedef int (* cmpptr_t)(const void *, const void *);
 
-#define IS_EXHAUSTED (0x001)
-#define IS_LEAF      (0x010)
+#define IS_EXHAUSTED  (0x001)
+#define IS_LEAF       (0x010)
+#define IS_MIXED_LEAF (0x100)
 
 struct Circular {
 	void    *start;
@@ -92,7 +93,7 @@ struct Funnel {
 	size_t	 funnel_allocate;
 	size_t	 funnel_cnt;
 	struct	 Circular 	*buffer;
-	char	 type;
+	int	 type;
 	struct TFunnel *tFunnel;
 };
 
