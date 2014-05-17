@@ -8,6 +8,7 @@
 #include "funnelsort.h"
 
 #define LEAF_SIZE 64
+#define MIXED_BUF_SIZE 128
 
 void funnel_init_non_leaf(
 		struct Funnel *f,
@@ -31,6 +32,7 @@ void funnel_init_leaf(
 		funnel_init_non_leaf(f, tFunnel, 1);
 		f->buffer = NULL;
 		f->type = IS_MIXED_LEAF;
+		funnel_add_child(f, funnel_create_binary_top(buffer, size, tFunnel, MIXED_BUF_SIZE));
 	} else {
 		f->tFunnel = tFunnel;
 		f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
@@ -173,7 +175,7 @@ int compare_int64(const void *p1, const void *p2) {
 }
 
 int main() {
-	size_t size = 1024;
+	size_t size = 1200000;
 	int64_t *a = calloc(size, sizeof(int64_t));
 	assert(a);
 	for (int i = 0; i < size; ++i)

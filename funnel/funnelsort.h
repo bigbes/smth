@@ -102,4 +102,6 @@ struct TFunnel {
 	size_t size;
 };
 void funnel_invoke(struct Funnel *);
+void funnel_add_child(struct Funnel *, struct Funnel *);
+struct Funnel *funnel_create_binary_top(void *, size_t, struct TFunnel *, size_t);
 #endif /* INCLUDES_FUNNELSORT_H */
