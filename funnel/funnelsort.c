@@ -31,19 +31,19 @@ void funnel_init_leaf(
 	if (size > LEAF_SIZE) {
 		funnel_init_non_leaf(f, tFunnel, 1);
 		f->buffer = NULL;
-		f->type = IS_MIXED_LEAF;
+		SET_MIXED_LEAF(f);
 		funnel_add_child(f, funnel_create_binary_top(buffer, size, tFunnel, MIXED_BUF_SIZE));
 	} else {
 		f->tFunnel = tFunnel;
 		f->buffer = (struct Circular *) malloc(sizeof(struct Circular));
-		f->type = IS_LEAF;
+		SET_LEAF(f);
 		qsort(buffer, size, f->tFunnel->size, f->tFunnel->cmp);
 		_circular_init_leaf(f->buffer, buffer, buffer + size * tFunnel->size, tFunnel->size);
 	}
 }
 
 void funnel_add_child(struct Funnel *f, struct Funnel *child) {
-	assert(!(f->type & IS_LEAF));
+	assert(!CHECK_LEAF(f));
 	if (f->funnel_cnt == f->funnel_allocate) {
 		f->funnel_allocate *= 2;
 		f->funnels = realloc(f->funnels, sizeof(struct Funnel *) * f->funnel_allocate);
@@ -78,26 +78,26 @@ void funnel_init_buffers(struct Funnel *f, size_t lvl, size_t height, size_t top
 }
 
 void *funnel_get(struct Funnel *f) {
-	if (f->type & IS_MIXED_LEAF)
+	if (CHECK_MIXED_LEAF(f))
 		return funnel_get(f->funnels[0]);
 	if (_circular_empty(f->buffer)) {
-		if (f->type & IS_EXHAUSTED)
+		if (CHECK_EXHAUSTED(f))
 			return NULL;
-		if (!(f->type & IS_LEAF))
+		if (!CHECK_LEAF(f))
 			funnel_invoke(f);
 	}
 	return _circular_get_left(f->buffer);
 }
 
 void funnel_pop(struct Funnel *f) {
-	if (f->type & IS_MIXED_LEAF)
+	if (CHECK_MIXED_LEAF(f))
 		return funnel_pop(f->funnels[0]);
 	assert(!_circular_empty(f->buffer));
 	_circular_pop_left(f->buffer);
 }
 void funnel_invoke(struct Funnel *f) {
-	assert(!(f->type & IS_LEAF));
-	while(!_circular_full(f->buffer) && !(f->type & IS_EXHAUSTED)) {
+	assert(!CHECK_LEAF(f));
+	while(!_circular_full(f->buffer) && !CHECK_EXHAUSTED(f)) {
 		void *min = funnel_get(f->funnels[0]);
 		size_t funnel = 0;
 		for (int i = 1; i < f->funnel_cnt; ++i) {
@@ -108,7 +108,7 @@ void funnel_invoke(struct Funnel *f) {
 			}
 		}
 		if (!min) {
-			f->type = f->type | IS_EXHAUSTED;
+			SET_EXHAUSTED(f);
 			continue;
 		}
 		_circular_put_right(f->buffer, min);

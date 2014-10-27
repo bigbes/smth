@@ -9,6 +9,15 @@ typedef int (* cmpptr_t)(const void *, const void *);
 #define IS_LEAF       (0x010)
 #define IS_MIXED_LEAF (0x100)
 
+#define SET_EXHAUSTED(f)	f->type = f->type | IS_EXHAUSTED
+#define CHECK_EXHAUSTED(f)	(f->type & IS_EXHAUSTED)
+
+#define SET_LEAF(f)		f->type = f->type | IS_LEAF
+#define CHECK_LEAF(f)		(f->type & IS_LEAF)
+
+#define SET_MIXED_LEAF(f)	f->type = f->type | IS_MIXED_LEAF
+#define CHECK_MIXED_LEAF(f)	(f->type & IS_MIXED_LEAF)
+
 struct Circular {
 	void    *start;
 	void    *end;

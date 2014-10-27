@@ -1,4 +1,4 @@
-SORT_SIZE=67108864
+SORT_SIZE=1200000
 export SORT_SIZE
 BUFFER_SIZE=32
 export BUFFER_SIZE
@@ -19,6 +19,8 @@ omp_rel:
 	strip funnel.out
 
 qsort:
+	gcc --std=c99 qsort.c -lm -o qsort.out -g
+qsort_rel:
 	gcc --std=c99 qsort.c -lm -o qsort.out -O3
 	strip qsort.out
 
@@ -33,8 +35,11 @@ timeit_qsort:
 vg:
 	valgrind --leak-check=full -v ./funnel.out > /dev/null 2> funnel.vg
 	valgrind --leak-check=full -v ./qsort.out > /dev/null 2> qsort.vg
-cg:
+cg: cg_funnel cg_qsort
+
+cg_funnel:
 	valgrind --tool=cachegrind ./funnel.out > /dev/null 2> funnel.cg
+cg_qsort:
 	valgrind --tool=cachegrind ./qsort.out > /dev/null 2> qsort.cg
 
 clean:
